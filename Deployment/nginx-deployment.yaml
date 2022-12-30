@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment                ## what are we creating
+metadata: 
+  name: nginx-deployment        ## name of the deployment
+  labels:
+    app: nginx
+spec:                           ## specifications for deployment
+  replicas: 1                   ## how many replicas of the pod we want to create 
+  selector:
+    matchLabels:
+      app: nginx
+  template:                     ## everything below template is the blueprint
+    metadata:                   ## for the pod
+      labels:
+        app: nginx
+    spec:                       ## specification for pod
+      containers:
+      - name: nginx
+        image: nginx:1.16
+        ports:
+        - containerPort: 8080   ## this one should match with targetPort in service.yaml

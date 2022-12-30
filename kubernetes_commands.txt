@@ -1,0 +1,34 @@
+kubectl create -h
+
+kubectl get all
+kubectl get nodes
+kubectl get pods
+kubectl get pod --watch
+kubectl get pods -o wide
+kubectl get services
+kubectl get replicaset 
+kubectl get deployment
+kubectl get deployment {deployment_name} -o yaml > deployment_file.yaml
+kubectl get namespace
+kubectl get configmap -n {namespace_name}
+kubectl get endpoints
+
+kubectl version
+
+kubectl create namespace {namespace_name}
+kubectl create deployment {deployment_name}
+kubectl create deployment nginx-depl --image=nginx 
+kubectl edit deployment {deployment_name}
+kubectl delete deployment {deployment_name}
+
+kubectl apply -f {file_name}
+kubectl apply -f {file_name} --namespace={namespace_name}
+kubectl delete -f {file_name}
+
+kubectl logs {pod_name}
+kubectl exec -it {pod_name} -- bin/bash
+
+kubectl describe pod {pod_name}
+kubectl describe service {service_name}
+
+kubectl cluster-info
