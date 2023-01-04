@@ -1,0 +1,53 @@
+Pods and labels
+Deployments
+Services
+PV and PVCs
+RBAC
+Cluster Upgrade
+ETCD Backup and Restore
+Manual Scheduling
+Metrics
+Network Policies
+Volumes
+Debugging
+Ingress
+Namespaces
+Daemonsets
+Configmaps
+Secrets
+JSONPath
+
+Common Questions
+-------------------
+-ETCD backup and restore
+-Upgrade cluster to v1.2x.x
+-RBAC: ClusterRole, ClusterRoleBinding, Role, RoleBinding, Service Accounts
+-Find nodes that are ready and taints not set as NoSchedule
+-Find pod that is consuming maximum CPU from all the pods in a given namespace
+-Add a sidecar container that prints the logs of main container. You need to 
+create emptyDir and mount to both the containers. Command to print logs will be
+given
+-Create a PVC of 10Mi and mount it to a container. Later patch PVC to 70Mi.
+-Create a pod with 2 containers. Image names and other info will be provided
+-Scale a deployment to 3 replicas
+-Create a deployment with X image and Y tag. Change the Y tag to Z and record
+the changes
+-Create a pod and manually schedule it with NodeSelector(disk:ssd)
+-Schedule a pod on master node without modifying labels on the node
+-Drain all workloads from a node
+-Create a network policy that allows all pods in Y namespace to talk to all 
+pods in X namespace on port 5432
+-A kubernetes worker node is in state NotReady. Investigate why this is the case,
+and perform any appropriate steps to bring the node to a ready state
+-Setting CPU and memory limits to containers of a pod
+-Security contexts to add user id and group id to pod, add additional capabilities
+like SYS_TIME and NET_ADMIN
+-Sort all pods by their order of creation
+-Write all namespaced resources to a file
+-Filter pods by certain labels and write the results to a file
+-Delete kube-proxy container from Y node. Use crictl ps and crictl rm 
+-Create a pod with given labels
+-Add a secondary container that runs certain commands like sleep 2000
+-Write a command to list all clusters from kubeconfig file into file
+-Create a pod with some environment variables
+-Mount an existing secret as a volume

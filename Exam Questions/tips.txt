@@ -1,0 +1,13 @@
+kubectl run nginx --image=nginx --dry-run=client -o yaml > pod.yaml
+
+use -h to get help on commands: kubectl create sa -h 
+
+delete resources without waiting by using --grace-period=0 --force
+
+switch contexts using: kubectl config use-context NAME
+
+ssh into any node: ssh <node-name>
+
+execute a command in a node without sshing into it: ssh <node-name> command
+
+base node name: hostname node-1

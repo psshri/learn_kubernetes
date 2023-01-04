@@ -1,0 +1,143 @@
+Q) Create a new pod called admin-pod with image busybox. Allow the pod to be 
+able to set system_time. The container should sleep for 3200 seconds.
+
+kubectl run admin-pod --image=busybox --command sleep 3200 --dry-run=client -o yaml
+
+-----pod.yaml-----
+apiVersion: v1
+kind: Pod
+metadata:
+    name: admin-pod
+    labels:
+        run: admin-pod
+spec:
+    containers:
+    - name: admin-pod
+      image: busybox
+      command:
+      - sleep
+      - "3200"
+      securityContext:
+        capabilities:
+            add: ["SYS_TIME"]
+
+kubectl apply -f pod.yaml
+
+****************************************************************************
+
+Q) A kubeconfig file called test.kubeconfig has been created in /root/TEST. 
+There is something wrong with the configuration. Troubleshoot and fix it.
+
+kubectl config view  //get the current config details using this command
+
+aise questions me port, namespace, user, etc aisi values check karna hota hai, 
+also compare the given kubeconfig file with the output of kubectl config view
+
+***************************************************************************
+
+Q) Create a new deployment called web-proj-268 with image nginx:1.16 and 1
+replica. Next upgrade the deployment to version 1.17 using rolling update.
+Make sure that the version upgrade is recorded in the resource annotation.
+
+kubectl create deployment web-proj-268 --image=nginx:1.16
+
+by default the update strategy is set to rolling update and replica is set to 1
+
+update the image using the following command
+kubectl set image deployment web-proj-268 nginx=nginx:1.17 --record=true 
+the container name in this case is nginx, ( use kubectl describe deployment web-proj-268)
+command to check the name of the container. that's why we have used nginx=nginx:1.17
+
+check the image version using the below command
+kubectl describe deployment web-proj-268 | grep -i image
+
+check the history of rollout using the following command
+kubectl rollout history deployment web-proj-268
+
+************************************************************************
+
+Q) Create a new deployment called web-003. Scale the deployment to 3 replicas.
+Make sure the desired number of pods are always running.
+
+kubectl create deployment web-003 --image=nginx --replicas=3
+
+okay, so in exam this command will execute but the pods will not be created,
+because the kube controller manager pod is not running. so we need to fix the
+kube controller manager pod first and then execute this command. learning: after
+running any command make sure to check whether the pod is created or not, even 
+after a successful execution, it is not necessary that the pod is created, just
+like this question.
+
+controller manager brings the actual number of pods to the desired number
+of pods.
+
+check for the kube-controller-manager pod via the following command
+kubectl get pods -n kube-system
+
+get logs of controller manager pod using the following command
+kubectl logs kube-controller-manager-minikube -n kube-system
+if there are no logs then you can describe the pod as well using the below command
+
+kubectl describe pod kube-controller-manager-controlplane -n kube-system
+
+use the below command to find the manifests file of all the system pods
+cd /etc/kubernetes/manifests/
+ls
+cat kube-controller-manager.yaml
+
+toh basically iss type ke question me kisi system pod ke manifest me koi
+gadbad hogi jise hame theek karna hai, for that we first need to identify ke
+problem kisme hai and kya hai
+
+if a simple question has a high weightage then there is some tricky thing
+involved there, so you must review whether the pod is actually created or not
+
+
+******************************************************************************
+
+Q) Upgrade the cluster (master and worker node) from 1.18.0 to 1.19.0
+Make sure to first drain both node and make it available after upgrade
+
+follow the steps below
+
+kubectl drain controlplannode --ignore-daemonsets
+apt update (on control plane node)
+apt install kubeadm=1.19.0-00
+kubeadm upgrade apply v1.19.0
+apt install kubelet=1.19.0-00
+systemctl restart kubelet
+kubectl uncordon controlplanenode
+// master upgrade is done
+
+kubectl drain node01 --ignore-daemonsets
+ssh node01
+apt update
+apt install kubeadm=1.19.0-00
+kubeadm upgrade node
+apt install kubelet=1.19.0-00
+systemctl restart kubelet
+press ctrl+d to come out of node01
+kubectl uncordon node01
+*************************************************************************
+
+Q) Deploy a web-load-5461 pod using the nginx:1.17 image with the labels set 
+to tier=web
+
+** pod.yaml **
+apiVersion: v1
+kind: Pod
+metadata:
+    name: podfile
+    labels:
+        tier: web
+spec:
+    containers:
+    - name: nginx
+      image: nginx:1.17
+
+kubectl apply -f pod.yaml
+
+or you can use the below command
+
+kubectl run web-load-5461 --image=nginx:1.17 --labels tier=web
+kubectl get pods --show-labels
