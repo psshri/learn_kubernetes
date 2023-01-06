@@ -141,3 +141,212 @@ or you can use the below command
 
 kubectl run web-load-5461 --image=nginx:1.17 --labels tier=web
 kubectl get pods --show-labels
+
+***************************************************************
+
+Q) create a static pod on node01 called static-nginx with image nginx and 
+you have to make sure that it is recreated/restarted automatically in case of
+any failure happens 
+
+types of questions on static pod
+1) You will be given with all the information and will be asked to schedule a
+static pod on any node (worker or master)
+2) You will be asked to delete a running static pod (unlike normal pods you can only
+ delete a running static pod by deleting its manifest file)
+3) You will be asked to move a static pod running on master node to worker node
+(move the file)
+
+how to identify a static pod: static pod has a suffix of node name in pod name
+
+how to identify the location where kubelet is running
+ssh node01
+ps -aux | grep kubelet
+find the kubelet config.yaml file, it is present at /var/lib/kubelet/config.yaml
+in this file you will see a key 'staticPodPath', this is the location where
+staticPod should be created (/etc/kubernetes/manifests). so at this location
+you should create the yaml file for static pod
+
+if you see this location in master node, you will see the manifests file for
+etcd, apiserver, controller manager and scheduler. kubeadm deploys the control
+plane components as a static pod
+
+static pods can only be deleted if we delete its yaml file
+
+kubelet will only be able to create static pod, if you try to write a deployment
+file in /etc/kubernetes/manifests, it will not work
+*************************************************************************
+
+q) create a pod called multi-pod with two containers with below description
+    c1: name container1, image nginx
+    c2: name container2, image busybox, command sleep 4800
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: multi-pod
+  labels:
+    env: dev
+spec:
+  containers:
+  - name: container1
+    image: nginx
+  - name: container2
+    image: busybox
+    command: ["sleep", "4800"]
+
+**************************************************************************
+
+q) create a pod called delta-pod in defense namespace belonging to the 
+development environment (env=dev) and frontend tier (tier=front), image=nginx:1.17
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: delta-pod
+  label:
+    env: dev
+    tier: front
+  namespace: defense 
+spec:
+  containers:
+  - image: nginx:1.17
+     name: delta-pod
+
+after completing a question, always verify whether the appropriate changes
+have been made or not, in this case, check whether the pod has been created 
+in the correct namespace or not with the correct image. use the following command
+to check
+
+kubect describe pod delta-pod -n defense | grep -i image
+
+*********************************************************
+
+Q) get the node node01 in JSON format and store it in a file at /opt/outputs/nodes-fz456723je.json
+
+kubectl get nodes node01 -o json > /opt/outputs/nodes-fz456723je.json
+ 
+(make sure there is a directory /opt/outputs, if not then create one)
+
+*********************************************************
+
+q) take a backup of the etcd database and save it to root with name "etcd-backup.db"
+
+search etcd snapshot in documentation
+
+ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 \
+  --cacert=<trusted-ca-file> --cert=<cert-file> --key=<key-file> \
+  snapshot save <backup-file-location>
+
+ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt --cert=/etc/kubernetes/pki/etcd/server.crt --key=/etc/kubernetes/pki/etcd/server.key \
+  snapshot save etcd-backup.db
+
+etcd-backup.db is the file location that is given in question
+
+****************************************************************************
+
+Q) a new application finance-audit-pod is deployed in finance namespace.
+There is something wrong with it. identify and fix the issue.
+
+note: no configuration changes allowed, you can only delete and recreate the pod
+(if required)
+
+kubectl -n finance describe pod finance-audit-pod
+
+yeh karke pod ko detail me dekho pehle toh
+
+under events you will see some logs and usme error dikhega
+
+isme sleep ka type tha sheep kar diya tha. so as per question, you cannot
+make any config changes, you need to delete this pod and recreate a pod bu
+creating a new yaml file for the pod
+
+to delete a pod use the below command, it works faster this way
+
+kubectl -n finance delete pod finance-audit-pod --grace-period=0 --force
+
+make sure to run kubectl get pods -n finance to check whether the pod is 
+actually removed or not
+
+***********************************************************
+
+q) create a pod called web-pod using image nginx, expose it internally with
+a service called web-pod-svc. check that you are able to look up the service
+and pod from within the cluster
+use the image: busybox:1.28 for dns lookup
+record results in /root/web-svc.svc and /root/web-pod.pod
+
+vim 1-pod.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: web-pod
+  app: web-pod
+spec:
+  containers:
+  - name: web-pod
+    image: nginx
+    ports:
+    - containerPort: 80
+
+vim 1-service.yaml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: serviceyamlfile
+spec:
+  selector:
+    app: web-pod
+  ports:
+  - protocol: TCP
+    targetPort: 80
+    port: 80
+
+kubectl apply -f 1-pod.yaml
+kubectl apply -f 1-service.yaml
+
+kubectl run lookuppod --image=busybox:1.28
+
+kubectl get pods -o wide //note the ipa of the pod
+
+kubectl exec -it lookuppod -- nslookup web-pod-svc > /root/web-svc.svc
+kubectl exec -it lookuppod -- nslookup 192-168-10-8.default.pod > /root/web-pod.pod
+
+for pods you need to provide its ipa, octets separated by - and followed by
+namespace (default in this case) and then followed by pod
+
+*************************************************************************
+
+q) use JSON PATH query to retrieve the osImages of all the nodes and store
+it in a file "allNodes_osImage_45CVB34ji.txt" at root location
+
+note: the osImages are under the nodeinfo section under status of each node
+
+kubectl get nodes -o=jsonpath='{.items[*].status.nodeInfo.osImage}' > file.txt
+
+
+****************************************************************************
+
+q) create a persistent volume with the given specification
+volume name: pv-rnd
+storage: 100Mi
+access modes: ReadWriteMany
+host path: /pv/host_data-rnd
+
+vim pv.yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-rnd
+  labels:
+    ques: three
+spec:
+  storageClassName: manual
+  capacity: 
+    storage: 100Mi
+  accessModes: 
+    - ReadWriteMany
+  hostPath:
+    path: "/pv/host_data-rnd" 

@@ -1,10 +1,15 @@
 kubectl create -h
 
+kubectl run {pod-name} --image=nginx
+kubectl run mypod --image=nginx --dry-run=client -o yaml
+kubectl run mypod --image=nginx -n {ns name} --labels env=dev,tier=front 
+
 kubectl get all
 kubectl get nodes
 kubectl get pods
 kubectl get pod --watch
 kubectl get pods -o wide
+kubectl get pods -l role=myrole    ## get pods with label role=myrole
 kubectl get services
 kubectl get replicaset 
 kubectl get deployment
@@ -12,6 +17,7 @@ kubectl get deployment {deployment_name} -o yaml > deployment_file.yaml
 kubectl get namespace
 kubectl get configmap -n {namespace_name}
 kubectl get endpoints
+kubectl get pv
 
 kubectl version
 
@@ -19,16 +25,25 @@ kubectl create namespace {namespace_name}
 kubectl create deployment {deployment_name}
 kubectl create deployment nginx-depl --image=nginx 
 kubectl edit deployment {deployment_name}
+
 kubectl delete deployment {deployment_name}
+kubectl delete -f {file_name}
+kubectl delete pod {pod-name}
+kubectl delete pod mypod --grace-period=0 --force
 
 kubectl apply -f {file_name}
 kubectl apply -f {file_name} --namespace={namespace_name}
-kubectl delete -f {file_name}
+
 
 kubectl logs {pod_name}
 kubectl exec -it {pod_name} -- bin/bash
+kubectl exec -it {pod_name} -- nslookup {svc_name}
 
 kubectl describe pod {pod_name}
+kubectl describe pod {pod_name} | grep -i image
 kubectl describe service {service_name}
 
 kubectl cluster-info
+
+kubectl api-resources
+kubectl api-resources --namespaced=true | grep pod
