@@ -10,6 +10,8 @@ kubectl get pods
 kubectl get pod --watch
 kubectl get pods -o wide
 kubectl get pods -l role=myrole    ## get pods with label role=myrole
+kubectl get pods -n {namespacename} --as {username}
+kubectl get pods --show-labels
 kubectl get services
 kubectl get replicaset 
 kubectl get deployment
@@ -18,11 +20,13 @@ kubectl get namespace
 kubectl get configmap -n {namespace_name}
 kubectl get endpoints
 kubectl get pv
+kubectl get rs {nameofreplicaset} -o wide
+kubectl get rs --show-labels
 
 kubectl version
 
 kubectl create namespace {namespace_name}
-kubectl create deployment {deployment_name}
+kubectl create deployment {deployment_name} --image={imagename}
 kubectl create deployment nginx-depl --image=nginx 
 kubectl edit deployment {deployment_name}
 
@@ -47,3 +51,36 @@ kubectl cluster-info
 
 kubectl api-resources
 kubectl api-resources --namespaced=true | grep pod
+
+kubectl expose pod {pod_name} -- name={service_name} --type=NodePort --dry-run=client -o yaml
+
+kubectl auth can-i get pods -n space --as alok
+
+systemctl status kubelet
+systemctl start kubelet
+systemctl restart kubelet
+
+## commands related to deployments
+
+check the history of deployment
+kubectl rollout history deployment {deploymentname}
+
+get more information about revision number for the deployment
+kubectl rollout history deployment {deploymentname} --revision 1
+
+rollback to any particular deployment version
+kubectl rollout undo deployment {deploymentname} --to-revision=1
+
+set new docker image and record information for deployment
+kubectl set image deployment {deploymentname} {containername}={newimage}
+
+scale existing deployment
+kubectl scale deployment {deploymentname} --replicas 10
+
+rollout undo
+kubectl rollout undo deployment {deploymentname}
+
+edit deployment
+kubectl edit deployment {deploymentname}
+
+kubectl debug node/node01 -it --image=ubuntu

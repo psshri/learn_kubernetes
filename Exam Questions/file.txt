@@ -350,3 +350,473 @@ spec:
     - ReadWriteMany
   hostPath:
     path: "/pv/host_data-rnd" 
+
+******************************************************************
+
+q) expose the "audit-web-app" web pod as service "audit-web-app-service" 
+application on port 30002 on the nodes on the cluster
+
+note: the web application listens on port 8080
+
+vim 1-pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: audit-web-app
+  labels:
+    app: audit-web-app
+spec:
+  containers:
+  - name: audit-web-app
+    image: nginx
+    ports:
+    - containerPort: 8080
+
+vim 1-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: audit-web-app-service
+spec:
+  selector:
+    app: audit-web-app
+  type: NodePort
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 30002
+
+always check your answers. check whether the pod and service are running or not
+and describe the service to see its endpoint and verify that it is that pod only
+
+******************************************************************************
+
+q) Taint the worker node node01 with details provided below. create a pod called
+dev-pod-nginx using image=nginx, make sure that workloads are not scheduled 
+to this worker node node01. create another pod called prod-pod-nginx using
+image=nginx with toleration to be scheduled on node01.
+details: key:env_type, value:production, operator:Equal and effect:NoSchedule
+
+kubectl taint node node01 env_type=production:NoSchedule
+
+vim 1-pod1.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dev-pod-nginx
+  labels:
+    app: dev-pod-nginx
+spec:
+  containers:
+  - name: dev-pod-nginx
+    image: nginx
+
+vim 1-pod2.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: prod-pod-nginx
+  labels:
+    app: prod-pod-nginx
+spec:
+  containers:
+  - name: prod-pod-nginx
+    image: nginx
+  tolerations:
+  - key: "env_type"
+    operator: "Equal"
+    value: "production"
+    effect: "NoSchedule"
+
+kubectl apply -f 1-pod1.yaml
+kubectl apply -f 1-pod2.yaml
+
+kubectl get pods -o wide
+
+*******************************************************************
+
+q) create a pod called pod-jxc56fv using the details below
+securityContext 
+runAsUser: 1000
+fsGroup: 2000
+
+image: redis:alpine
+
+vim pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-jxc56fv
+  labels:
+    app: pod-jxc56fv
+spec:
+  containers:
+  - name: pod-jxc56fv
+    image: redis:alpine
+  securityContext:
+    runAsUser: 1000
+    fsGroup: 2000
+
+kubectl apply -f pod.yaml
+
+****************************************************************************
+
+q) worker node node01 is not responding, have a look and fix the issue
+
+you need to think ke konse processed worker node pe chalte hain jo agar kharab
+ho jaye toh worker node ruk jayega, its kubelet and kubeproxy, their pods and
+services
+
+kubectl get nodes
+-> not ready 
+
+kubectl describe node node01
+
+try to find any error here
+
+if not then ssh to the node
+
+ssh node01
+
+check the status of kubelet using the below command
+systemctl status kubelet
+
+you will find some error logs there
+
+systemctl start kubelet
+use the above command to start kubelet
+
+itna karne yeh question toh solve ho gaya
+
+************************************************************************
+
+Q) list the InternalIP of all nodes of the cluster. save the result to a file
+/root/Internal_IP_List
+
+answer should be in the format: InternalIP of First Node<space>InternalIP of 
+Second Node (in a single line)
+
+aise questions me jsonpath use hota hai and its a good idea to search 
+cheat sheet in k8s docs
+
+example externalip ka hai doc me so you have to ctrl+f for externalip, itna
+dimaag chalna chahiye ki external ka bhi search kare along with internal cauz
+json output me dono ka placement ek jaisa hi hona chahiye
+
+kubectl get nodes -o jsonpath='{.items[*].status.addresses[?(@.type=="InternalIP")].address}' > /root/Internal_IP_List
+
+**********************************************************************
+
+Q) one static pod "web-static", image busybox, is currently running on controlplane
+node, move that static pod to run on node01, don't need to do any other changes
+
+note: static pod name should be changed from web-static-controlplane to 
+web-static-node01
+
+--
+note is just to confuse you, node name is already appened to the static pod
+name
+
+ps -aux | grep kubelet
+cat /var/lib/kubelet/config.yaml
+cd /etc/kubernetes/manifests
+vim pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: web-static
+  labels:
+    app: web-static
+spec:
+  containers:
+  - name: web-static
+    image: busybox
+    command: ["sleep", "10000"]
+
+kubectl get pods
+
+ssh node01
+cd /etc/kubernetes/manifests
+vim pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: web-static
+  labels:
+    app: web-static
+spec:
+  containers:
+  - name: web-static
+    image: busybox
+    command: ["sleep", "10000"]
+
+*************video8*********************************************************
+
+Q) A new user named "alok" need to be created. grant him access to the cluster.
+user "alok" should have permission to create, list, get, update and delete pods
+in the space namespace. the private key exists at location: /root/alok.key and
+csr at /root/alok.csr
+
+search 'certificate signing request' in k8s docs
+
+copy the csr yaml file from the doc
+vim csr.yaml
+apiVersion: certificates.k8s.io/v1
+kind: CertificateSigningRequest
+metadata:
+  name: alok
+spec:
+  request:
+  signerName: kubernetes.io/kube-apiserver-client
+  usages:
+  - client auth
+
+request is base64 encoded value of the csr content 
+cat alok.csr | base64 | tr -d "\n"
+
+kubectl apply -f csr.yaml
+
+kubectl get csr
+
+to check whether the user alok is allowed to get pods from the namespace space
+run the following command
+kubectl get pods -n space --as alok
+this will through an error
+
+the csr is still in pending state so you need to approve it
+
+kubectl certificate approve alok 
+
+now create role and rolebinding
+
+vim role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: space
+  name: pod-reader
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["create","get","update","list","delete"]
+
+kubectl apply -f role.yaml
+
+vim rb.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadat:
+  name: read-pods
+  namespace: space
+subjects:
+- kind: User
+  name: alok
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: pod-reader
+  apiGroup: rbac.authorization.k8s.io
+
+kubectl apply -f rb.yaml
+
+kubectl get pods -n space --as alok
+you won't find any error this time
+
+you can also use the below command to test the permission of alok
+kubectl auth can-i get pods -n space --as alok
+yes
+
+*********************************************************************
+
+Q) create a persistent volume, presistentvolumeclaim, pod with below specifications
+pv
+volume name: mypvlog
+storage: 100Mi
+access modes: ReadWriteMany
+host path: /pv/log
+reclaim policy: Retain
+
+pvc
+volume name: pv-claim-log
+storage request: 50Mi
+access modes: ReadWriteMany
+
+pod
+name: my-nginx-pod
+image: nginx
+volume: PersistentVolumeClaim=pv-claim-log
+volume mount: /log
+
+vim pv.yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mypvlog
+  labels:
+    type: local
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 100Mi
+  accessModes: 
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  hostPath:
+    path: /pv/log
+
+vim pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pv-claim-log
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests: 
+      storage: 50Mi
+
+vim pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-nginx-pod
+spec:
+  containers:
+  - name: my-nginx-pod
+    image: nginx
+    volumeMounts: 
+      - mountPath: "/log"
+        name: v1
+  volumes:
+    - name: v1
+      persistentVolumeClaim: 
+        claimName: pv-claim-log
+
+kubectl apply -f pv.yaml
+kubectl apply -f pvc.yaml
+kubectl apply -f pod.yaml
+
+***********************************************************************
+
+Q) worker node node01 is not responding, have a look and fix the issue
+
+kubectl get nodes
+kubectl describe nodes node01
+ssh node01
+systemctl status kubelet
+systemctl restart kubelet
+
+agar iske baad start ho jata hai toh theek otherwise
+
+journalctl -u kubelet
+look for any failure related msg
+press ctrl+g to load more msg, press enter
+
+cat /var/lib/kubelet/config.yaml
+update the ca cert file location
+systemctl daemon-reload
+systemctl restart kubelet
+
+systemctl status kubelet
+kubectl get nodes
+************************************************************************
+
+Q) a pod "my-nginx-pod" (image=nginx) in custom namespace is not running. Find
+the problem and fix it and make it running. all the supported definitions files 
+has been placed at root
+
+kubectl get pods -n custom
+kubectl describe pod my-nginx-pod -n custom
+
+under the events you can see the reason, in this case pvc not found, so check
+for pv and pvc
+
+kubectl get pv
+kubectl get pvc -n custom
+
+pvc also needs to be in the same namespace as of pod, ie custom
+
+kubectl get pvc 
+
+delete the pvc and edit the pvc yaml file to include the namespace: custom
+
+you need to delete pv as well, cauz uska status released hoga pvc delete karne
+ke baad and we need its status to be available
+
+must verify the final status of the pod
+
+***************************************************************************
+
+Q) create a multi-container pod, "multi-pod" in development namespace using
+images nginx and redis
+
+kubectl create ns development
+
+vim pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: multi-pod
+  labels:
+    app: multi-pod
+  namespace: development
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+  - name: redis
+    image: redis
+
+kubectl apply -f pod.yaml
+kubectl get pods -n development
+kubectl describe pod multi-pod -n development
+
+**********************************************************************
+
+Q) a pod "nginx-pod" (image=nginx) in default namespace is not running. find
+the problem and fix it and make it running.
+
+kubectl get pods
+kubectl describe pod nginx-pod
+
+under events you can see that both the nodes had taint that the pod didn't tolerate
+so either you can add toleration to the pod or remove taint. addind toleration
+is a good idea
+
+kubectl get nodes -o wide
+kubectl describe node node01 | grep -i taint
+kubectl describe node controlplane | grep -i taint
+
+find the taint information for the node, effect, key:value
+
+
+vim pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-pod
+  labels:
+    app: nginx-pod
+spec:
+  containers:
+  - name: nginx-container
+    image: nginx
+  tolerations:
+  - key: "color"
+    operator: "Equal"
+    value: "blue"
+    effect: "NoSchedule"
+  
+if you don't find the yaml file for any entity then just create it
+kubectl get pod nginx-pod -o yaml > pod.yaml
+aise cases me kabhi bhi naya pod.yaml nahi banana cauz running container
+me kaafi saare infos ho sakte hain jo tum otherwise miss kar jao
+so only use the above command to get the output in the yaml format. 
+ya phir ek baar dekh lena ki kya kya info hai usme, agar koi imp lage toh 
+zaroor use karna
+
+********************************video 10*************************************
+
+q) 

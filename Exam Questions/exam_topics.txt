@@ -153,3 +153,322 @@ pv-pvc is 1-1 mapping only
 pv is not namespaced
 pvc is namespaced
 pods are namespaced
+
+=========================================================================
+
+TAINTS & TOLERATIONS
+
+kubectl taint nodes node01 key1=value1:NoSchedule
+
+above command will place a taint on node node01. the taint has key key1, value
+value1 and taint effect NoSchedule. this means that no pod will be able to 
+schedule onto node01 unless it has a matching toleration. if a pod has a matching
+toleration it can be deployed on node01 and other nodes as well which has no
+restrictions 
+
+to remove the taint added by the command above, you can run:
+
+kubectl taint node node01 key1=value1:NoSchedule-
+
+
+NoSchedule: the pod will not be scheduled on the node
+PreferNoSchedule: the system will try to avoid placing a pod on the node but
+that is not guaranteed
+NoExecute: new pod will not be scheduled on the node and existing pods on the node,
+if any will be evicted, if they do not tolerate the taint
+
+vim pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+  labels:
+    env: test
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+  tolerations:
+  - key: "key1"
+    operator: "Equal"
+    value: "value1"
+    effect: "NoSchedule"
+
+kubectl describe node controlplane | grep -i taint
+
+*****************************************************************************
+
+ROLE, ROLEBINDING, CLUSTERROLE, CLUSTERROLEBINDING
+
+below is an example of a role in the default namespace that can be used to 
+grant read access to pods
+
+role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: default
+  name: pod-reader
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get","watch","list"]
+
+below is an example of clusterrole that can be used to grant read access
+to secrets in any particular namespace or across all namespaces (depending on
+how it is bound)
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: secret-reader
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get","watch","list"]
+
+role bindings grants the permissions defined in role to a user or group
+
+rolebindings example
+here is an example of a rolebinding that grants the pods-reader role to the 
+user jane within the default namespace. this allows jane to read pods in the 
+default namespace
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding 
+metadata:
+  name: read-pods
+  namespace: default
+subjects:
+- kind: User
+  name: jane
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: pod-reader
+  apiGroup: rbac.authorization.k8s.io
+
+
+a rolebinding can also reference a clusterrole to grant the permissions 
+defined in that clusterrole to resources inside the rolebinding's namespace.
+this kind of reference lets you define a set of common roles across your cluster
+then reuse them within multiple namespaces
+
+for example, even though the following rolebinding refers to a clusterrole, dave
+will only be able to read secrets in the developement namespace, because the 
+rolebinding's namespace is development
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: read-secrets
+  namespace: development
+subjects:
+- kind: User
+  name: dave
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: secret-reader
+  apiGroup: rbac.authorization.k8s.io
+
+
+the following clusterrolebinding allows any user in the group manager to read
+secrets in any namespace
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: read-secrets-global
+subjects:
+- kind: Group
+  name: manager
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: secret-reader
+  apiGroup: rbac.authorization.k8s.io
+
+after you create a binding, you cannot change the role or clusterrole it refers 
+to
+
+***************************************************************************
+
+CERTIFICATE SIGNING REQUEST, USER ADDITION
+
+follow the below steps in order to get a normal user to be able to 
+authenticate and invoke an API. first, this user must have a certificate 
+issued by the kubernetes cluster, and then present that certificate to the 
+kubernetes API
+
+create a private key
+
+openssl genrsa -out myuser.key 2048
+openssl req -new -key myuser.key -out myuser.csr
+
+create a csr
+vim csr.yaml
+apiVersion: certificates.k8s.io/v1
+kind: CertificateSigningRequest
+metadata:
+  name: myuser
+spec:
+  request: 
+  signerName: kubernetes.io/kube-apiserver-client
+  usages:
+  - client auth
+
+request is the base64 encoded value of the csr file content. get the content
+using below command
+cat myuser.csr | base64 | tr -d "\n"
+
+kubectl apply -f csr.yaml
+
+use kubectl to create a csr and approve it
+kubectl get csr
+kubectl certificate approve myuser
+
+the certificate value is in base64 encoded format under status.certificate. 
+export the issued certificate from the certificatesigningrequest
+
+kubectl get csr myuser -o jsonpath='{.status.certificate}' | base64 -d > myuser.crt
+
+with certificate created it is time to define role and rolebinding for this user
+to access kubernetes cluster resources
+
+vim role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: default
+  name: developer
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["create", "get", "list", "update", "delete"]
+
+vim rolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: developer-binding-myuser
+  namespace: default
+subjects:
+- kind: User
+  name: myuser
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: developer
+  apiGroup: rbac.authorization.k8s.io
+
+kubectl apply -f role.yaml
+kubectl apply -f rolebinding.yaml
+
+add this user to kubeconfig file
+kubectl config set-credentials myuser --client-key=myuser.key --client-certificate=myuser.crt --embed-certs=true
+kubectl config set-context myuser --cluster=kubernetes --user=myuser
+kubectl config use-context myuser
+
+************************************************************************
+
+REPLICASET  
+
+the ReplicaSet ensures that the specified number of pods are running at all times
+
+another reason we need replicaset is to create multiple pods to share the load
+across them. balances the load across multiple pods on different nodes,
+when demand increases
+
+the replicaset spans across the multiple nodes in the cluster
+
+automatic rollback to a previous version is not possible with replicaset,
+that's why deployments are used 
+
+vim replicaset.yaml
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: replicaset-example
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      name: nginx-pod
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.14
+
+kubectl apply -f replicaset.yaml
+kubectl get rs
+
+if you now update the image version of rs file, then it will be updated in the 
+rs but not in pod. so this is one disadvantage of rs, if you want to update 
+the image version, then you first need to delete the replicaset then apply it
+again
+
+if you create a pod and label it as key1:value1 and then if you create a rs
+and set replicas as 4 and if you set the label in rs as key1:value1, then the
+number of pods created by rs will be just 3 and not 4, because rs's job is
+to make sure that in total 4 pods should be running with matching labels and 
+since 1 is already running, therefore it will create just 3. so make sure that
+your bare pods or any other pods do not have labels which match selector of one
+of your replicas 
+
+************************************************************************
+
+DEPLOYMENTS
+
+deployments comes with the feature of rollback
+
+with deployments you can perform update in a rollout manner to ensure that 
+your application is not down
+
+deployments works on top of replicasets and replicasets works on top of pods
+
+deployment ensures that only a certain number of pods are down while they are
+being updated. by default, deployment ensures that at least 25% of the desired
+number of pods are up
+
+deployment keeps the history of revision which has been made
+
+vim deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      name: nginx-pod
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx-container
+        image: nginx
+
+
+
+***********************************************************************
+
+DEBUGGIN NODES
+
+kubectl debug node/node01 -it --image=ubuntu
+use the above command if you cannot access the node using ssh, the above
+command opens an interactive shell on the node
+
+************************************************************************
+
