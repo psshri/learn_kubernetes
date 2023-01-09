@@ -472,3 +472,78 @@ command opens an interactive shell on the node
 
 ************************************************************************
 
+TROUBLESHOOTING APPLICATIONS
+
+DEBUG PODS
+
+the first step is to take a loot at it, check the current state of the pod and recent events
+kubectl describe pod {pod_name}
+
+look at the state of the containers in the pod. are they all running? have there been recent restarts?
+
+if a pod is stuck in pending, it means that it cannot be scheduled onto a node. generally this is because
+there are insufficient resources of one type or another that prevent scheduling. look at the output of 
+kubectl describe command above, there should be messages from the scheduler about why it cannot 
+schedule your pod.
+
+-reason: you don't have enough resources: CPU/memory exhausted in the cluster, in this case
+you need to delete pods, adjust resource requests or add new nodes to your cluster
+-reason: you are using hostPort: when you bind a pod to a hostPort there are a limited number of places
+that pod can be scheduled. in most cases, hostPort is unnecessary, try using a service object to expose 
+your pod. if you do require hostPort then you can only schedule as many pods as there are nodes in 
+your kubernetes cluster. 
+
+if a pod is stuck in the waiting state, then it has been scheduled to a worker node, but it can't run
+on that machine. info from kubectl describe should be useful. the most common cause of waiting pods 
+is a failure to pull the image. there are three things to check
+1) make sure you have the name of the image correct
+2) have you pushed the image to the registry
+3) try to manually pull the image to see if the image can be pulled. docker pull <imagename>
+
+if a pod is crashing or otherwise unhealthy
+refer to debug running pods
+
+if a pod is running but not doing its intended purpose: there may be an error in the pod yaml file and
+that error was silently ignored when you created the pod. ususal mistakes are nesting issues and typos
+the first thing to do is to delete your pod and create it again with --validate option 
+kubectl apply -f mypod.yaml --validate
+it highlights any spelling mistakes as well
+
+the next thing to check is whether the pod on the apiserver matches the pod you meant to create . run 
+kubectl get pod mypod -o yaml > mypod-on-apiserver.yaml and then manually compare the original 
+pod description, if there are lines in the original yaml file that are not present in the apiserver file
+then it indicates problem with pod spec
+
+------------------------------------------------------------------------------------------
+
+DEBUG REPLICATION CONTROLLERS
+
+replication controllers are quite straightforward, if they can't create pods then debug your pods
+you can also use kubectl describe rc {rcname}
+
+-------------------------------------------------------------------------------------------
+
+DEBUG SERVICES
+
+there are several problems that can make service not run properly.
+First, verify that there are endpoints for the service 
+kubectl get endpoints {servicename}
+make sure that the endpoints match up with the number of pods that you expect to be members of your
+service 
+
+if endpoints are missing, try listing pods using the labels that service uses 
+kubectl get pods --selector=key1=value1,key2=value2
+
+verify that the pod's containerPort matches up with service's targetPort
+
+first step is to make sure that the service has been created
+
+you also need to make sure that there are no network policy ingress rules which may affect incoming 
+traffic to your pods 
+
+if your service is running, has endpoints, and your pods are actually serving. at this point 
+the whole service proxy mechanism is suspect. 
+
+check whether kube-proxy is running?
+ps auxw | grep kube-proxy
+
