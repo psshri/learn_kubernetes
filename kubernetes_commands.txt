@@ -22,6 +22,7 @@ kubectl get endpoints
 kubectl get pv
 kubectl get rs {nameofreplicaset} -o wide
 kubectl get rs --show-labels
+kubectl get netpol
 
 kubectl version
 

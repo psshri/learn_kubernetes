@@ -547,3 +547,295 @@ the whole service proxy mechanism is suspect.
 check whether kube-proxy is running?
 ps auxw | grep kube-proxy
 
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+NETWORK POLICIES
+
+vim networkpolicy.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-network-policy
+  namespace: default
+spec:
+  podSelector: 
+    matchLabels:
+      run: pod01
+  policyTypes:
+  - Ingress
+  - Egress
+
+demo
+create two pods
+vim pod1.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod1
+  labels:
+    app: pod1
+spec:
+  containers:
+  - name: pod1
+    image: busybox
+    command: ["sleep","4800"]
+
+vim pod2.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod2
+  labels:
+    app: pod2
+spec:
+  containers:
+  - name: pod2
+    image: busybox
+    command: ["sleep","4800"]
+
+kubectl apply -f pod1.yaml
+kubectl apply -f pod2.yaml
+
+lets access pod2 from inside of pod1
+
+kubectl exec -it pod2 -- sh
+ping <ip-pod1>
+
+you will be able to reach pod1 from pod2, now create a network policy to
+restrict ingress traffic to pod1
+
+pod1 will not be able to accept any incoming traffic 
+vim netpol.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-network-policy
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: pod1
+  policyTypes:
+  - Ingress 
+
+kubectl exec -it pod2 -- sh
+ping <ip-pod1>
+ping will not work this time
+
+
+
+another example of network policy
+
+vim networkpolicy.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: test-network-policy
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      role: db
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 172.17.0.0/16
+            except:
+              - 172.17.1.0/24
+        - namespaceSelector:
+            matchLabels:
+              project: myproject
+        - podSelector:
+            matchLabels:
+              role: frontend
+      ports:
+        - protocol: TCP
+          port: 6379
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.0.0.0/24
+      ports:
+        - protocol: TCP
+          port: 5978
+
+podSelector selects the group of pods to which the policy applies. an empty
+selector selects all pods in the namespace
+
+policyTypes field indicates whether or not the given policy applies to ingress
+traffic to selected pod or egress traffic from selected pod or both. by default
+if nothing is specified, ingress is considered
+
+ingress: traffic should match both the from and ports section 
+egress: traffic matches both the to and ports section
+
+so the above network policy isolates role=db pods in the default namespace 
+for both ingress and egress traffic 
+
+ingress rules allows connections to all pods in the default namespace 
+with the label role=db on TCP port 6379 from:
+  - any pod from the default namespace with label role=frontend
+  - any pod in the namespace with label project=myproject
+  - ipa in the ranges 172.17.0.0 - 172.17.0.255 and 172.17.2.0 - 172.17.255.255 
+    (ie all of 172.17.0.0/16 except 172.17.1.0/24)
+
+egress rules allows connections from any pod in the default namespace with the
+label role=db to CIDR 10.0.0.0/24 on TCP port 5978
+
+behaviour of to and from selectors
+there are 4 kinds of selectors that can be specified in an ingress from 
+section or egress to section
+
+podSelector: this selects particular pods in the same namespace as the 
+network policy which should be allowed as ingress sources or egress destinations
+
+namespaceSelector: this selects particular namespaces for which all pods 
+should be allowed as ingress sources or egress destinations
+
+namespaceSelector and podSelector: selects particular pods within particular 
+namespaces 
+
+ipBlock: this selects particular ip cidr ranges to allow as ingress sources 
+or egress destinations. these should be cluster-external ips, since pod ips 
+are ephemeral and unpredictable 
+
+
+example
+ingress:
+- from:
+  - namespaceSelector:
+      matchLabels:
+        user: alice
+    podSelector:
+      matchLabels:
+        role: client
+
+above policy allows connections from pods with label role:client from the 
+namespace having label user:alice
+
+example:
+ingress:
+- from:
+  - namespaceSelector:
+      matchLabels:
+        user: alice
+  - podSelector:
+      matchLabels:
+        role: client
+
+above network policy allows connections from pods in the local namespace with
+the label role=client or from any pod in any namespace with label user=alice
+
+
+default deny all ingress traffic
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+spec:
+  podSelector: {}
+  policyTypes: 
+  - Ingress
+
+allow all ingress traffic
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-all-ingress
+spec:
+  podSelector: {}
+  ingress:
+  - {}
+  policyTypes:
+  - Ingress
+
+
+default deny all egress traffic
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+spec:
+  podSelector: {}
+  policyTypes: 
+  - Egress
+
+allow all egress traffic
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-all-egress
+spec:
+  podSelector: {}
+  policyTypes:
+  - Egress
+  egress:
+  - {}
+
+default deny all egress and ingress traffic
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-egress-ingress
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+
+
+targeting a range of ports
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: multi-egress-port
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      role: db
+  policyTypes: 
+    - Egress 
+  egress:
+    - to: 
+        - ipBlock:
+            cidr: 10.0.0.0/24
+      ports:
+        - protocol: TCP
+          port: 32000
+          endPort: 32768
+
+the above rule allows any pod with label role=db on the namespace default
+to communicate with any IP within the range 10.0.0.0/24 over TCP, provided
+that the targetPort is between the range 32000 and 32768
+
+=========================================================================
+
+CLUSTER UPGRADE
+
+upgrade will be done using kubeadm 
+upgrade will be carried out one node at a time, starting with master node
+we need to drain the nodes before doing upgrade
+
+master node upgrade command
+kubeadm upgrade plan
+kubectl drain controlplane --ignore-daemonsets
+apt update
+apt install kubeadm=1.19.0-00
+kubeadm upgrade apply v1.19.0
+apt install kubelet=1.19.0-00
+systemctl restart kubelet
+kubectl uncordon controlplane
+
+worker node upgrade command
+kubectl drain node01 --ignore-daemonsets
+ssh node01
+apt update
+apt install kubeadm=1.19.0-00
+kubeadm upgrade node
+apt install kubelet=1.19.0-00
+systemctl restart kubelet
+kubectl uncordon node01
