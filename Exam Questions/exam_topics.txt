@@ -839,3 +839,164 @@ kubeadm upgrade node
 apt install kubelet=1.19.0-00
 systemctl restart kubelet
 kubectl uncordon node01
+
+*************************************************************************
+
+DAEMONSETS
+
+a daemonset ensures that all (or some) nodes run a copy of a pod. as nodes are
+added to the cluster, pods are added to them. As nodes are removed from the 
+cluster, those pods are garbage collected. deleting a daemonset will clean up the 
+pods it created. 
+
+some use cases
+- running a cluster storage daemon on every node
+- running a log collection daemon on every node
+- running a node monitoring daemon on every node
+
+vim daemonset.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: antivirus
+spec:
+  selector: 
+    matchLabels:
+      tier: antivirus
+  template:
+    metadata:
+      labels:
+        tier: antivirus
+    spec: 
+      containers:
+      - name: antivirus-container
+        image: nginx
+
+to delete daemonset pods, you need to delete daemonset file, use the following
+command to delete the daemonset
+kubectl delete -f daemonset.yaml
+and do not use rm daemonset.yaml, isse yeh file bhi chale jayegi and 
+you won't be able to delete the pods as well
+
+running pods on select nodes
+if you specify a .spec.template.spec.nodeSelector, then the daemonset controller
+will create pods on nodes which match the node selector. likewise if you
+specify a .spec.template.spec.affinity, then daemonset controller will create
+pods on nodes which match that node affinity. if you do not specify either,
+then the daemonset controller will create pods on all nodes. 
+
+=============================================================================
+
+NodeName and NodeSelector
+
+Both NodeName and NodeSelector help to assign a pod to a particular node in a 
+cluster 
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+  nodeName: controlplane
+
+this pod will run on the controlplane
+
+if you try to schedule a pod on a specific node by using nodeName parameter
+and if you request resources more than what is available on that node then the
+pod will not be scheduled, pod will go in pending state or out of memory in this
+case. see the below example. even if there is some other node in the cluster that
+have sufficient requirements, the pod will not be scheduled there
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod1
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+    resources:
+      requests:
+        memory: "2100Mi"
+        cpu: "250m"
+
+below is an example of nodeSelector
+apiVersion: v1
+kind: Pod
+metadata: 
+  name: pod1
+  labels:
+    app: pod1
+spec:
+  containers:
+  - name: pod1
+    image: nginx
+  nodeSelector:
+    disk: ssd
+
+label a node with the below command
+kubectl label node node01 disk=ssd
+
+above pod will be scheduled on nodes having disk:ssd as a label
+
+pods with nodeName in their yaml mainfest files are not sent to scheduler, they
+are sent to the respective node's kubelet directly by the api server. for 
+nodeSelector, scheduler is used
+
+===================================================================
+
+NODEAFFINITY
+
+You can constrain a pod so that it can only run on particular set of nodes
+
+nodeselector is going to be deprecated by kubernetes, nodeaffinity is better 
+than nodeselector 
+
+vim nodeaffinity.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod1
+  labels:
+    app: pod1
+spec:
+  containers:
+  - name: pod1
+    image: nginx
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: size
+            operator: In
+            values: 
+            - low
+            - medium
+
+vim nodeaffinity1.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod2
+  labels:
+    app: pod2
+spec:
+  containers:
+  - name: pod2
+    image: nginx
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 1
+        preference:
+          matchExpression:
+          - key: size
+            operator: In
+            values: 
+            - dontKnow
+
+your nodes should have relevant labels

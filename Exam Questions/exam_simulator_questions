@@ -1,0 +1,113 @@
+1) you have access to multiple clusters from your main terminal through kubectl 
+contexts. write all those contexts names into /opt/course/1/contexts
+
+next write a command to display the current context into /opt/course/1/context_default_kubectl.sh, the command should use kubectl 
+
+finally write a second command doing the same thing into /opt/course/1/context_default_no_kubectl.sh but without the use of kubectl 
+
+
+
+
+use the following command to get all the contexts
+kubectl config get-contexts
+use the following command to get just NAME column data
+kubectl config get-contexts --no-headers | awk {'print $2'}
+kubectl config get-contexts --no-headers | awk {'print $2'} > /opt/course/1/contexts
+use the following command to create the directory first
+mkdir -p /opt/course/1/
+
+kubectl config current-context
+echo "kubectl config current-context" > /opt/course/1/context_default_kubectl.sh
+bash /opt/course/1/context_default_kubectl.sh
+
+echo "cat /etc/kubernetes/kubelet.config | grep -i current-context" > /opt/course/1/context_default_no_kubectl.sh
+
+****************************************************************************
+
+2) use context : kubectl config use-context k8s-c1-H
+
+create a single pod of image httpd:2.4.41-alpine in namespace default. the pod should be named pod1 and the container should be named pod1-container. this pod should only be scheduled on a master node, do not add new labels on any node
+
+we can use the following methods to solve this problem
+1) nodeName
+2) use the existing labels of the controlplane
+
+vim pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod1
+  labels:
+    app: pod1
+spec:
+  containers:
+  - name: pod1-container
+    image: httpd:2.4.41-alpine
+  nodeName: controlplane
+
+kubectl apply -f pod.yaml
+kubectl get pods -o wide
+
+never forget to check
+
+***************************************************************************
+
+3) use context kubectl config use-context k8s-c1-H
+there are two pods named 03db-* in namespace project-c13. C13 management asked you to scale the pods down to one replica to save resources 
+
+kubectl get pods -n project-c13 
+kubectl -n project-c13 scale statefulset 03db --replicas=1
+
+*************************************************************************
+
+4) use context: kubectl config use-context k8s-c1-H
+do the following in the namespace default. create a single pod named 
+"ready-if-service-ready" of image "nginx:1.16.1-alpine". configure a 
+liveness probe that simply runs true. also configure a readinessprobe 
+which does check if the url "http://service-am-i-ready:80" is reachable, 
+you can use wget-T2 -0- "http://service-am-i-ready:80" for this. start the pod
+and confirm it isnt ready because of the readinessprobe.
+create a second pod named am-i-ready of image nginx:1.16.1-alpine with label 
+id: cross-server-ready. the already existing service 'service-am-i-ready' should
+now have that secondpod as endpoint.
+now the first pod should be in ready state, confirm that 
+
+kubectl config use-context k8s-c1-H
+
+vim secondpod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: am-i-ready
+  labels:
+    id: cross-server-ready
+spec:
+  containers:
+  - name: am-i-ready-container
+    image: nginx:1.16.1-alpine
+
+vim firstpod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ready-if-service-ready
+  labels:
+    app: ready-if-service-ready
+spec:
+  containers:
+  - name: c1
+    image: nginx:1.16.1-alpine
+    livenessProbe:
+      exec:
+        command: ["true"]
+      initialDelaySeconds: 5
+      periodSeconds: 5
+    readinessProbe:
+      exec:
+        command: ["wget -T2 -0- http://service-am-i-ready:80"]
+      initialDealySeconds: 5
+      periodSeconds: 5
+
+***********************************************************************
+
+Q5) use conte

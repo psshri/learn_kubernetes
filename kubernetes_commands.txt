@@ -85,3 +85,7 @@ edit deployment
 kubectl edit deployment {deploymentname}
 
 kubectl debug node/node01 -it --image=ubuntu
+
+kubectl label node node01 disk=ssd
+
+kubectl cordon node01 

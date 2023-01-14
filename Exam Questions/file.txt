@@ -819,4 +819,144 @@ zaroor use karna
 
 ********************************video 10*************************************
 
-q) 
+q) create a new deployment called nginx-deploy with image nginx:1.16 and 8
+replicas. there are 5 worker nodes in the cluster. make sure no pod gets
+deployed on two worker node mentioned below
+Worker-node-1
+Worker-node-2
+
+kubectl label node Worker-node-1 no=schedule
+kubectl label node Worker-node-2 no=schedule
+
+vim deploymentfile.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deploy
+  labels:
+    name: nginx-deploy
+spec:
+  replicas: 8
+  selector: 
+    matchLabels:
+      name: nginx-deploy
+  template:
+    metadata:
+      labels:
+        name: nginx-deploy
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+        ports:
+        - containerPort: 80
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: no
+                operator: NotIn
+                values:
+                - schedule
+
+another way is to cordon both these nodes and then run the pods
+kubectl cordon node01
+
+****************************************************************
+
+q) create a replicaset (name: web-prod, image: nginx:1.16, replica:3)
+there is already a pod running in the cluster. please make sure that the total 
+count of pod running in the cluster is not more than 3
+
+first check the running pod's name, image, label
+use the label and apply it in your replicaset file
+
+vim replicaset.yaml
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: web-prod
+  labels:
+    app: web-prod
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: web-prod
+  template:
+    metadata:
+      labels:
+        app: web-prod
+    spec:
+      containers:
+      - name: web-prod
+        image: nginx:1.16
+
+
+*********************************************************************
+
+q) there are three nodes in the cluster, create daemonset (name: my-pod, image:
+nginx) on each node except one (worker-node-3)
+
+one way is to taint the node and don't specify any tolerations on the pods. 
+another way it to label the node and then use antiaffinity
+
+kubectl taint node node01 key1=value1:NoSchedule
+
+vim daemonset.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: my-pod
+  labels:
+    app: my-pod
+spec:
+  selector:
+    matchLabels:
+      app: my-pod
+  template:
+    metadata:
+      labels:
+        app: my-pod
+    spec:
+      containers:
+      - name: my-pod 
+        image: nginx
+
+since i just have two nodes, so we need to first remove the taints from the 
+controlplane first
+
+*************************video 11********************************************
+
+Q) there are two worker node associated with kubernetes cluster, use 
+JSONPATH query to retrieve node's osImage name and store it in a file
+"~/getAllOsImageNodeName.txt"
+
+kubectl get nodes -o=jsonpath='{.items[*].status.nodeInfo.osImage}' > /file.txt
+
+you can execute kubectl get nodes -o yaml to get a better view of the 
+data hierarchy
+
+**********************video 12******************************************
+
+Q) create a pod "front-end-helper" that writes "binaries downloaded successfully"
+into a file "front-end-helper-log.txt" and then exits
+check pod "front-end-helper" should be deleted automatically when it's completed
+
+for pods that are just spin up to get some work done before the actual 
+process begins, busybox images are used because they are exited once their 
+task is done
+
+kubectl run front-end-helper --image=busybox -it --rm --restart=Never 
+-- /bin/sh -c 'echo binaries downloaded successfully' > front-end-helper-log.txt
+
+
+*******************video 13********************************
+
+q) check how many nodes are in ready state and write the information about nodes
+tainted with "NoSchedule" into file CKAC00466.txt 
+
+kubectl get nodes -o json | jq ".items[]|{name:.metadata.name,
+taints:.spec.taints}" > file.txt
+
