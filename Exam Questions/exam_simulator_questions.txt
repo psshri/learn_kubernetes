@@ -110,4 +110,632 @@ spec:
 
 ***********************************************************************
 
-Q5) use conte
+Q5) use context: kubectl config use-context k8s-c1-H
+
+There are various pods in all namespaces. write a command into /opt/course/5/
+find_pods.sh which lists all pods sorted by their AGE (metadata.creationTimestamp)
+
+write a second command into /opt/course/5/find_pods_uid.sh which lists all pods
+sorted by field metadata.uid. use kubectl sorting for both commands
+
+kubectl config use-context k8s-c1-H
+
+mkdir -p /opt/course/5
+echo "kubectl get pods --all-namespaces --sort-by=.metadata.creationTimestamp"
+> /opt/course/5/find_pods.sh 
+bash /opt/course/5/find_pods.sh
+
+echo "kubectl get pods --all-namespaces --sort-by=.metadata.uid" > /opt/course/
+5/find_pods_uid.sh
+bash /opt/course/5/find_pods_uid.sh
+
+*****************************************************************************
+
+Q6) use context kubectl config use-context k8s-c1-H
+create a new PersistentVolume named safari-pv. it should have a capacity of 2Gi,
+accessMode ReadWriteOnce, hostPath /Volumes/Data and no storageClassName defined
+
+next create a new PersistentVolumeClaim in Namespace project-tiger named 
+safari-pvc. it should request 2Gi storage, accessMode ReadWriteOnce and should
+not define a storageClassName. The PVC should bound to the PV correctly
+
+Finally create a new deployment safari in namespace project-tiger which mounts
+that volume at /tmp/safari-data. the pods of that deployment should be of image
+httpd:2.4.41-alpine
+
+kubectl config use-context k8s-c1-H
+
+vim persistentvolume.yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: safari-pv
+  labels:
+    type: local
+spec: 
+  capacity:
+    storage: 2Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/Volumes/Data"
+
+kubectl create namespace project-tiger
+
+vim persistentvolumeclaim.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: safari-pvc
+  namespace: project-tiger
+spec: 
+  accessModes: 
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+  
+vim deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: safari
+  namespace: project-tiget
+  labels:
+    name: safari
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: safari
+  template:
+    metadata:
+      labels:
+        name: safari
+    spec:
+      containers:
+      - name: safari-container
+        image: httpd:2.4.41-alpine
+        volumeMounts:
+          - mountPath: "/tmp/safari-data"
+            name: safari-pvc
+      volumes:
+        - name: vol1
+          persistentVolumeClaim:
+            claimName: safari-pvc
+
+kubectl apply -f persistentvolume.yaml
+kubectl apply -f persistentvolumeclaim.yaml
+kubectl apply -f deployment.yaml
+
+***********************************************************************
+
+Q7) use context: kubectl config use-context k8s-c1-H
+the metrics server has been installed in the cluster. your colleague would
+like to know the kubectl commands to 
+1. show nodes resource usage 
+2. show pods and their containers resource usage
+write the commands into /opt/course/7/node.sh and /opt/course/7/pod.sh
+
+kubectl config use-context k8s-c1-H
+mkdir -p /opt/course/7
+echo "kubectl top nodes" > /opt/course/7/node.sh
+bash /opt/course/7/node.sh
+echo "kubectl top pods" > /opt/course/7/pod.sh
+bash /opt/course/7/pod.sh
+
+**************************************************************************
+
+Q8) use context kubectl config use-context k8s-c1-H
+ssh into the master node with ssh cluster1-master1. check how the master 
+components kubelet, kube-apiserver, kube-scheduler, kube-controller-manager and
+etcd are started/installed on the master node. also find out the name of the 
+dns application and how it's started/installed on the master node. write
+your findings into file /opt/course/8/master-components.txt the file should be
+structured like.
+
+# /opt/course/8/master-components.txt
+kubelet: [TYPE]
+kube-apiserver: [TYPE]
+kube-scheduler: [TYPE]
+kube-controller-manager: [TYPE]
+etcd: [TYPE]
+dns: [TYPE] [NAME]
+
+choices of type are 'not-installed', 'process', 'static-pod', 'pod'
+
+51:50
+
+doubt
+
+***************************************************************************
+Q9) use context : kubectl config use-context k8s-c2-AC
+ssh into the master node with 'ssh cluster2-master1'. temporarily stop the 
+kube-scheduler, this means in a way that you can start it again afterwards
+
+create a single pod named 'manual-schedule' of image httpd:2.4-alpine, confirm
+its created but not scheduled on any node. 
+
+now you are the scheduler and have all its power, manually schedule that pod 
+on node cluster2-master1. make sure it's running
+
+start the kube-scheduler again and confirm its running correctly by creating 
+a second pod named manual-schedule2 of image httpd:2.4-alpine and check if
+it's running on cluster2-worker1
+
+
+
+kube config use-context k8s-c2-AC
+vim /etc/kubernetes/manifests/kube-scheduler.yaml
+just change the apiVersion: to some garbage
+
+vim manual-schedule.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: manual-schedule
+  labels:
+    app: manual-schedule
+spec:
+  containers:
+  - name: manual-schedule
+    image: httpd:2.4-alpine
+
+kubectl apply -f manual-schedule.yaml
+
+the pod won't be scheduled on any node
+enter the nodename in the pod yaml file.
+
+(i ran the pod as a static pod first to run it without kube scheduler, but
+it modifies the name of the pod, so just run it on a specific node by providing
+nodeName argument in the pod yaml file, this is a good way)
+
+kubectl get pods
+
+and once you revert the changes made in the kube-scheduler file, you can see
+that the pod is running on worker node and the static pod runs on the master node
+
+vim manual-schedule2.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: manual-schedule2
+  labels:
+    app: manual-schedule2
+spec:
+  containers:
+  - name: manual-schedule2
+    image: httpd:2.4-alpine
+
+*********************************************************************
+Q10) use context kubectl config use-context k8s-c1-H
+create a new ServiceAccount processor in Namespace project-hamster. create
+a role and roleBinding, both named processor as well. these should allow the
+new SA to only create Secrets and ConfigMaps in that Namespace
+
+1.07.43
+
+kubectl config use-context k8s-c1-H
+kubectl create namespace project-hamster
+
+vim sa.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: processor
+  namespace: project-hamster
+
+vim role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: processor
+  namespace: project-hamster
+rules:
+- apiGroups: [""]
+  resources: ["configmaps","secrets"]
+  verbs: ["create"]
+
+vim rolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: processor
+  namespace: project-hamster
+subjects:
+- kind: ServiceAccount
+  name: processor
+  namespace: project-hamster 
+roleRef:
+  kind: Role
+  name: processor
+  apiGroup: rbac.authorization.k8s.io
+
+**********************************************************************
+Q11)  use context kubectl config use-context k8s-c1-H
+use namespace project-tiger for the following. create a daemonset named 
+ds-important with image httpd:2.4-alpine and labels id=ds-important and
+uuid=kkk.... the pods it creates should request 10 millicore cpu and 10
+mebibyte memory. the pods of that daemonset should run on all nodes, 
+master and worker
+
+kubectl config use-context k8s-c1-H
+kubectl create namespace project-tiger
+
+vim daemonsets.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: ds-important
+  namespace: project-tiger
+  labels:
+    id: ds-important
+    uudi: 99
+spec:
+  selector:
+    matchLabels:
+      app: imp
+  template:
+    metadata:
+      labels:
+        app: imp
+    spec:
+      tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: c1
+        image: httpd:2.4-alpine
+        resources:
+          requests:
+            cpu: 10m
+            memory: 10Mi
+
+learning: daemonset define karo toh tolerations bhi include karo so that the 
+pod can run on control plane as well
+
+***************************************************************************
+Q12) use context kubectl config use-context k8s-c1-H
+use namespace project-tiger for the following. create a deployment named 
+deploy-important with label id=very-important (the pods should also have
+this label) and 3 replicas. it should contain 2 containers, the first named
+container1 with image nginx:1.17.6-alpine and the second one named container2 
+with image kubernetes/pause
+
+there should be only ever one pod of that deployment running on one worker node.
+we have two worker nodes: cluster1-worker1 and cluster1-worker2. because the 
+deployment has 3 replicas, the result should be that on both nodes one pod is
+running, the third pod won't be scheduled, unless a new worker node will be 
+added. 
+
+in a way we kind of stimulate the behaviour of a daemonset here, but using a
+deployment and a fixed number of replicas
+
+1.16.35
+
+kubectl config use-context k8s-c1-H
+kubectl create namespace project-tiger
+kubectl label node node01 key1=value1
+
+vim deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deploy-important
+  namespace: project-tiger
+  labels:
+    id: very-important
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      id: very-important
+  template:
+    metadata:
+      labels:
+        id: very-important
+    spec:
+      containers:
+      - name: container1
+        image: nginx:1.17.6-alpine
+      - name: container2
+        image: kubernetes/pause
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: id
+                operator: In
+                values: 
+                - very-important
+            topologyKey: "kubernetes.io/hostname"
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: key1
+                operator: In
+                values: 
+                - value1
+            topologyKey: "kubernetes.io/hostname"
+
+this solution isn't working
+
+**************************************************************************
+
+Q13) use context: kubectl config use-context k8s-c1-H
+
+create a pod named 'multi-container-playground' in namespace default with three 
+containers named c1, c2, c3. there should be a volume attached to that pod and 
+mounted into every container, but the volume shouldn't be persisted or shared
+with other pods
+
+container c1 should be of image nginx:1.17.6-alpine and have the name of the 
+node where its pod is running available as environment variable MY_NODE_NAME
+
+container c2 should be of image busybox:1.31.1 and write the output of the date
+command every second in the shared volume into file date.log. you can use 
+while true; do date >> /your/vol/path/date.log; sleep 1; done for this
+
+container c3 should be of image busybox:1.31.1 and constantly send the content
+of file date.log from the shared volume to stdout. you can use tail -f /your/
+vol/path/date.log for this.
+
+check the logs of container c3 to confirm correct setup
+
+kubectl config use-context k8s-c1-H
+
+vim pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: multi-container-playground
+spec:
+  containers:
+  - name: c1
+    image: nginx:1.17.6-alpine
+    volumeMounts:
+    - name: vol1
+      mountPath: /data/c
+    env:
+      - name: MY_NODE_NAME
+        valueFrom: 
+          fieldRef:
+            fieldPath: spec.nodeName
+  - name: c2
+    image: busybox:1.31.1
+    volumeMounts:
+    - name: vol1
+      mountPath: /data/c
+    command: ["sh", "-c"]
+    args:
+    - while true;
+        do date >> /data/c/date.log;
+        sleep 1;
+      done;
+  - name: c3
+    image: busybox:1.31.1
+    volumeMounts:
+    - name: vol1
+      mountPath: /data/c
+    command: ["sh", "-c"]
+    args:
+    - while true;
+        tail -f /data/c/date.log;
+      done;
+  volumes:
+  - name: vol1
+    emptyDir: {}
+
+kubectl apply -f pod.yaml
+kubect exec -it podname -- sh -c c2
+cat /data/c/date.log
+
+kubectl exec -it podname -- sh -c c1
+printenv
+
+kubectl logs podname -c c3
+
+*******************************************************************
+
+Q14) use context kubectl config use-context k8s-c1-H
+
+you are asked to find out following information about the cluster k8s-c1-H
+1. how many master nodes are available
+2. how many worker nodes are available
+3. what is the service cidr
+4. which networking (or cni plugin) is configured and where is its config file
+5. which suffic will static pods have that run on cluster1-worker1
+
+write your answers into file /opt/course/14/cluster-info, structured like this
+
+# /opt/course/14/cluster-info
+1: [ans]
+2: [ans]
+3: [ans]
+4: [ans]
+5: [ans]
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Q15) use context kubectl config use-context k8s-c2-AC
+
+write a command into /opt/course/15/cluster_events.sh which shows the latest 
+events in the whole cluster, ordered by time. use kubectl for it
+
+now kill the kube-proxy pod running on node cluster2-worker1 and write the 
+events this caused into /opt/course/15/pod_kill.log
+
+finally kill the containerd container of the kube-proxy pod on node cluster2-
+worker1 and write the events into /opt/course/15/container_kill.log
+
+mkdir -p /opt/course/15
+echo "kubectl get events -A --sort-by=.metadata.creationTimestamp" >> /opt/course/15/cluster_events.sh
+
+kubectl delete pods -n kube-system kube-proxy-zxe
+mkdir -p /opt/course/15
+kubectl get events -n kube-system > /opt/course/15/pod_kill.log
+
+ssh node01
+crictl ps
+crictl stop containerid
+exit
+kubect get events -n kube-system > /opt/course/15/container_kill.log
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+Q16) use context kubectl config use-context k8s-c1-H
+create a new namespace called cka-master
+
+write the names of all namespaced kubernetes resources (like pod, secret, config
+map) into /opt/course/16/resources.txt
+
+find the project-* namespace with the highest number of roles defined in it and
+write its name and amount of roles into /opt/course/16/crowded-namespace.txt
+
+kubectl config use-context k8s-c1-H
+kubectl create namespace cka-master
+mkdir -p /opt/course/16
+kubectl api-resources --namespaced=true | awk {'print $1'} > /opt/course/16/resources.txt
+
+kubectl get roles -n project-c13 --no-headers | wc -l
+
+*********************************************************************
+
+Q17) use context: kubectl config use-context k8s-c1-H
+In namespace project-tiger create a pod named tigers-reunite of image 
+httpd:2.4.41-alpine with labels pod=container and container=pod. find out on 
+which node the pod is scheduled. ssh into that node and find the containerd
+container belonging to that pod 
+using command crictl 
+1) write the ID of the container and the info.runtimeType into /opt/course/17/
+pod-container.txt 
+2) write the logs of the container into /opt/course/17/pod-container.log
+
+kubectl config use-context k8s-c1-H
+kubectl create ns project-tiger
+
+vim pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: tigers-reunite
+  namespace: project-tiger
+  labels:
+    pod: container
+    container: pod
+spec:
+  containers:
+  - name: c1
+    image: httpd:2.4.41-alpine
+
+kubectl apply -f pod.yaml
+kubectl -n project-tiger get pods -o wide
+
+ssh node01
+crictl logs containerid
+crictl ps
+crictl info containerid | grep -i key
+
+manually copy paste stuffs into the file
+
+***********************************************************************
+
+Q18) use context kubectl config use-context
+there seems to be an issue with the kubelet not running on cluster3-worker1
+fix it and confirm that cluster has node cluster3-worker1 available in ready 
+state afterwards. you should be able to schedule a pod on cluster3-worker1 
+afterwards 
+write the reason of the issue to /opt/course/18/reason.txt
+
+ssh cluster3-worker1
+cd /etc/kubernetes
+cat kubelet.conf
+
+systemctl status kubelet
+systemctl start kubelet
+systemctl restart kubelet
+systemctl daemon-reload
+
+journalctl -u kubelet.service
+
+/var/lib/kubelet
+/etc/kubernetes/manifests
+
+doubt
+
+************************************************************************
+
+Q19) use context: kubectl config use-context k8s-c3-CCC
+do the following in a new namespace secret. create a pod named secret-pod of
+image busybox:1.31.1 which should keep running for sometime. there is an existing
+secret located at /opt/course/19/secret1.yaml, create it in the namespace secret
+and mount it readOnly into the pod at /tmp/secret1
+create a new secret in namespace secret called secret2 which should contain 
+user=user1 and pass=1234. these entries should be available inside the pod's 
+container as environment variables APP_USER and APP_PASS
+
+kubectl config use-context k8s-c3-CCC
+kubectl create namespace secret
+
+vim secret1.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: secret1
+  namespace: secret
+type: Opaque
+data:
+  USER_NAME: YWraf=
+  PASSWORD: MWy=
+
+vim secret2.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  namespace: secret
+  name: secret2
+type: Opaque
+data:
+  user: user1
+  pass: pass1234
+
+vim pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: secret-pod
+  namespace: secret
+spec:
+  volumes:
+  - name: vol1
+    secret:
+      secretName: secret1
+  containers:
+  - name: c1
+    image: busybox:1.31.1
+    command: ["sleep", "5000"]
+    volumeMounts:
+    - name: vol1
+      readOnly: true
+      mountPath: "/tmp/secret1"
+    env:
+      - name: APP_USER
+        valueFrom:
+          secretKeyRef:
+            name: secret2
+            key: user
+      - name: APP_PASS  
+        valueFrom:
+          secretKeyRef:
+            name: secret2
+            key: pass
+
+kubectl apply -f secret1.yaml
+kubectl apply -f secret2.yaml
+kubectl apply -f pod.yaml
+  
+********************************************************************
+Q20) 2.37 

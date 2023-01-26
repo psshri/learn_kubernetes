@@ -1000,3 +1000,262 @@ spec:
             - dontKnow
 
 your nodes should have relevant labels
+
+*********************************************************************
+
+Liveness, Readiness and Startup Probes
+
+the kubelet uses liveness probe to know when to restart a container.
+the kubelet uses readiness probe to know when a container is ready to start 
+accepting traffic. a pod is considered to be ready when all of its containers
+are ready
+the kubelet uses startup probes to know when a container application has started.
+if such a probe is configured, it disables liveness and readiness checks until
+it succeeds, making sure those probes don't interfere with the application
+startup
+
+vim liveness.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: liveness-pod
+  labels:
+    app: liveness-pod
+spec:
+  containers:
+  - name: liveness-container
+    image: busybox
+    args:
+    - /bin/sh
+    - -c
+    - touch /tmp/healthy; sleep 30; rm -f /tmp/healthy; sleep 600
+    livenessProbe:
+      exec:
+        command:
+        - cat
+        - /tmp/healthy
+      initialDelaySeconds: 5
+      periodSeconds: 5
+
+periodSeconds specifies that the kubelet should perform a liveness probe
+every 5 seconds 
+the initialDelaySeconds field tells the kubelet that it should wait 5 seconds 
+before performing the first probe
+to perform the probe, the kubelet executes the command cat /tmp/healthy in 
+the target container, if the command succeeds, it returns 0 and the kubelet 
+considers the container to be alive and healthy. if the command returns a 
+non-zero value, the kubelet kills the container and restarts it.
+when the container starts it executes this command
+/bin/sh -c "touch /tmp/healthy; sleep 30; rm -f /tmp/healthy; sleep 600"
+
+for the first 30 seconds of the container's life there is a /tmp/healthy file 
+so during the first 30 seconds the command runs successfully (liveness probe)
+
+DEFINE A LIVENESS HTTP REQUEST
+to perform a probe, the kubelet sends an HTTP GET request to the server that
+is running in the container and listening on port 8080. if the handler for 
+the server's path returns a success code, the kubelet considers the container
+to be alive and healthy
+
+DEFINE A TCP LIVENESS PROBE 
+it uses a tcp socket, the kubelet will attempt to open a socket to your 
+container on the specified port. if it can establish a connection, the 
+container is considered healthy
+
+
+
+PROTECT SLOW STARTING CONTAINERS WITH STARTUP PROBES
+
+ports:
+- name: liveness-port
+  containerPort: 8080
+  hostPort: 8080
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: liveness-port
+  failureThreshold: 1
+  periodSeconds: 10
+startupProbe:
+  httpGet:
+    path: /healthz
+    port: liveness-port
+  failureThreshold: 30
+  periodSeconds: 10
+
+
+DEFINE READINESS PROBE
+a pod with containers reporting that they are not ready does not receive 
+traffic through kubernetes service
+readiness probe runs on the container during its whole lifecycle
+liveness probes do not wait for readiness probe to succeed. if you want to 
+wait before executing a liveness probe you should use initialDelaySeconds 
+or a startupProbe
+readiness and liveness probes can be used together in parallel for the same
+container. using both can ensure that the traffic does not reach a container 
+that is not ready for it, and that containers are restarted when they fail 
+
+
+***************************************************************************
+
+REQUESTS AND LIMITS
+
+when you specify a pod, you can optionally specify how much of each resource 
+a container needs. the most common resources to specify are CPU and memory (RAM)
+
+requests: kube-scheduler uses this info to decide which node to place the pod on.
+limit: the kubelet ensures that the running container is not allowed to use
+more of that resource than the limit you set. the kubelet also reserves at least 
+the request amount of that system resource specifically for that container to use
+
+cpu and memory are collectively referred to as compute resources
+
+1.0 = one core
+100m = 100 milli core
+
+the following pod has 2 containers. both containers are defined with a request
+for 0.25 CPU and 64MiB of memory. each container has a limit of 0.5 CPU and
+128MiB of memory. you can say that the pod has a request of 0.5 CPU and 128 MiB
+of memory and a limit of 1 CPU and 256 MiB of memory
+
+vim pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod1
+  labels:
+    app: pod1
+spec:
+  containers:
+  - name: c1
+    image: nginx
+    resources:
+      requests:
+        cpu: "250m"
+        memory: "64Mi"
+      limits:
+        cpu: "500m"
+        memory: "128Mi"
+  - name: c2
+    image: nginx
+    resources:
+      requests:
+        cpu: "250m"
+        memory: "64Mi"
+      limits:
+        cpu: "500m"
+        memory: "128Mi"
+
+**********************************************************************
+
+EXPOSE POD INFORMATION TO CONTAINERS THROUGH ENVIRONMENT VARIABLES
+
+https://kubernetes.io/docs/tasks/inject-data-application/environment-variable-expose-pod-information/
+
+use pod fields as values for environment variables
+in the following yaml file you project pod-level fields into the running 
+container as environment variables
+
+vim pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod1
+spec:
+  containers:
+  - name: test
+    image: registry.k8s.io/busybox
+    command: ["sh", "-c"]
+    args:
+    - while true; do
+        echo -en '\n';
+        printenv MY_NODE_NAME MY_POD_NAME MY_POD_NAMESPACE;
+        printenv MY_POD_IP MY_POD_SERVICE_ACCOUNT;
+        sleep 10;
+      done;
+    env:
+      - name: MY_NODE_NAME
+        valueFrom: 
+          fieldRef:
+            fieldPath: spec.nodeName
+      - name: MY_POD_NAME
+        valueFrom: 
+          fieldRef:
+            fieldPath: metadata.name
+      - name: MY_POD_NAMESPACE
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.namespace
+      - name: MY_POD_IP
+        valueFrom: 
+          fieldRef:
+            fieldPath: status.podIP
+      - name: MY_POD_SERVICE_ACCOUNT
+        valueFrom:
+          fieldRef: 
+            fieldPath: spec.serviceAccountName
+  restartPolicy: Never
+
+kubectl apply -f pod.yaml
+kubectl get pods
+kubectl logs podname
+
+kubectl exec -it podname -- sh
+printenv
+
+
+use container fields as values for environment variables
+in the following yaml file, you are going to pass fields that are part
+of the pod definition, but taken from the specific container rather than
+from the pod overall
+
+vim pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod1
+spec:
+  restartPolicy: Never
+  containers:
+  - name: pod1
+    image: registry.k8s.io/busybox:1.24
+    command: ["sh", "-c"]
+    args:
+    - while true; do
+        echo -en '\n';
+        printenv MY_CPU_REQUEST MY_CPU_LIMIT;
+        printenv MY_MEM_REQUEST MY_MEM_LIMIT;
+        sleep 10;
+      done;
+    resources:
+      requests:
+        memory: "32Mi"
+        cpu: "125m"
+      limits:
+        memory: "64Mi"
+        cpu: "250m"
+    env: 
+      - name: MY_CPU_REQUEST
+        valueFrom: 
+          resourceFieldRef: 
+            containerName: pod1
+            resource: requests.cpu
+      - name: MY_CPU_LIMIT
+        valueFrom:
+          resourceFieldRef:
+            containerName: pod1
+            resource: limits.cpu
+      - name: MY_MEM_REQUEST
+        valueFrom: 
+          resourceFieldRef:
+            containerName: pod1
+            resource: requests.memory
+      - name: MY_MEM_LIMIT
+        valueFrom: 
+          resourceFieldRef:
+            containerName: pod1
+            resource: limits.memory
+
+kubectl apply -f pod.yaml
+kubectl get pods
+kubectl logs pod1

@@ -7,11 +7,13 @@ kubectl run mypod --image=nginx -n {ns name} --labels env=dev,tier=front
 kubectl get all
 kubectl get nodes
 kubectl get pods
+kubectl get pods --all-namespaces
 kubectl get pod --watch
 kubectl get pods -o wide
 kubectl get pods -l role=myrole    ## get pods with label role=myrole
 kubectl get pods -n {namespacename} --as {username}
 kubectl get pods --show-labels
+kubectl get pods -n kube-system --no-headers | wc -l
 kubectl get services
 kubectl get replicaset 
 kubectl get deployment
