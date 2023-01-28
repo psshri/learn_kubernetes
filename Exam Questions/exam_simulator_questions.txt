@@ -738,4 +738,94 @@ kubectl apply -f secret2.yaml
 kubectl apply -f pod.yaml
   
 ********************************************************************
-Q20) 2.37 
+Q20) use context kubectl config use-context k8s-c3-CCC
+
+node 'cluster3-worker2' is running an older k8s version and is not even part of
+the cluster. update k8s on that node to the exact version that's running on 
+cluster3-master1. then add this node to the cluster. use kubeadm for this.
+
+kubectl config use-context k8s-c3-CCC
+
+follow the steps mentioned in the documentation
+https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/
+
+to join the node to the cluster run the following command on the master node
+kubeadm token create --print-join-command
+
+****************************************************************************
+Q21) use context kubectl config use-context k8s-c3-CCC
+
+create a static pod named my-static-pod in default namespace on cluster3-master1
+it should be of image nginx:1.16-alpine and have resource requests for 10m CPU 
+and 20Mi memory
+
+then create a nodePort service named static-pod-service which exposes that 
+static pod on port 80 and check if it has Endpoints and if its reachable 
+through the cluster3-master1 internal ip address. you can connect to the 
+internal node IPs from your main terminal
+
+kubectl config use-context k8s-c3-CCC
+cd /etc/kubernetes/manifests
+
+vim pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-static-pod
+  labels:
+    app: myapp
+spec: 
+  containers:
+  - name: c1
+    image: nginx:1.16-alpine
+    resources:
+      requests:
+        memory: "20Mi"
+        cpu: "10m"
+
+vim service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: static-pod-service
+spec:
+  type: NodePort
+  selector:
+    app: myapp
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30001
+
+kubectl apply -f service.yaml
+
+kubectl get service
+kubectl get ep
+
+*****************************************************************************
+
+Q22) use context kubectl config use-context k8s-c2-AC
+check how long the kube-apiserver server certificate is valid on cluster2-
+master1. do this with openssl or cfssl. write the expiration date into 
+/opt/course/22/expiration. also run the correct kubeadm command to list the 
+expiration dates and confirm both methods show the same date. write the correct
+kubeadm command that would renew the apiserver server certificate into 
+/opt/course/22/kubeadm-renew-certs.sh
+
+kubectl config use-context k8s-c2-AC
+
+openssl x509 -noout -text -in /etc/kubernetes/pki/apiserver.crt | grep -i 
+Validity -A4
+
+kubeadm certs check-expiration
+
+mkdir -p /opt/course/22/
+echo "kubeadm certs renew apiserver" > /opt/course/22/kubeadm-renew-certs.sh
+
+############################################################################
+
+Q23) use context kubectl config use-context k8s-c2-AC
+
+node cluster2-worker1
+
+3:02:35
