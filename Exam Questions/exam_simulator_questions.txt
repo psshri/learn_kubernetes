@@ -826,6 +826,66 @@ echo "kubeadm certs renew apiserver" > /opt/course/22/kubeadm-renew-certs.sh
 
 Q23) use context kubectl config use-context k8s-c2-AC
 
-node cluster2-worker1
+node cluster2-worker1 has been added to the cluster using kubeadm and TLS boot
+strapping. find the "issuer" and "extended key usage" values of the cluster2-
+worker1 
+1. kubelet client certificate: the one used for outgoing connections to the 
+kube-apiserver
+2. kubelet server certificate: the one used for incoming connections from the
+kube-apiserver
 
-3:02:35
+write the information into file: /opt/course/23/certificate-info.txt
+compare the issuer and extended key usage fields of both certificates and make
+sense of these
+
+doubt
+
+############################################################################
+
+Q25)  use context kubectl config use-context k8s-c3-CCC
+make a backup of etcd running on cluster3-master1 and save it on the master
+node at /tmp/etcd-backup.db
+
+then create a pod of your kind in the cluster
+
+finally restore the backup, confirm the cluster is still working and that the
+created pod is no longer with us
+
+doc ref: https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/#restoring-an-etcd-cluster
+
+
+kubectl config use-context k8s-c3-CCC
+
+ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 \
+--cacert=<trusted-ca-file> --cert=<cert-file> --key=<key-file> \
+snapshot save <backup-file-location>
+
+fill in the values from 
+kubectl describe pod -n kube-system etcd-controlplane
+
+create a simple pod
+vim pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod1
+  labels:
+    app: pod1
+spec:
+  containers:
+  - name: pod1
+    image: nginx
+
+kubectl apply -f pod.yaml
+
+ETCDCTL_API=3 etcdctl snapshot restore --data-dir <data-dir-location> <backup-file-location>
+
+data-dir-location is the place where you want to restore the etcd snapshot
+
+now point the etcd static pod yaml file to point to the new etcd location
+
+vim /etc/kubernetes/mainfests/etcd.yaml
+edit the path under hostpath for etcd vol
+/etc/kubernetes/manifests/etcd-etcd.yaml
+
+#############################################################################

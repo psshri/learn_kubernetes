@@ -243,6 +243,9 @@ ETCDCTL_API=3 etcdctl --endpoints=https://127.0.0.1:2379 \
 
 etcd-backup.db is the file location that is given in question
 
+trusted-ca-file, cert-file, key-file can be obtained using the description of 
+the etcd pod
+
 ****************************************************************************
 
 Q) a new application finance-audit-pod is deployed in finance namespace.
