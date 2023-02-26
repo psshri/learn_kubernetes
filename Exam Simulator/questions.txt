@@ -1,0 +1,23 @@
+- if you want to print the second string in grep command
+cat .kube/config | grep -i current-context | awk '{print $2}'
+or
+cat .kube/config | grep -i current-context | sed -e "s/current-context: //"
+
+i think .kube folder current directory me hi rahega
+
+
+kubectl get pods -o name
+
+commands: ["sh", "-c", "wget -T2 -O- http://service-am-i-ready:80 "]
+
+/etc/cni yaha cni info hota hai
+
+suffix for static pod is -nodeName
+
+count of roles across all namespaces
+kubectl get roles --all-namespaces | awk '{print $1}' | uniq -c
+
+systemctl daemon-reload && systemctl restart kubelet
+
+
+kubeadm token create --print-join-command

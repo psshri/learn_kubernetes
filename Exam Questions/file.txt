@@ -276,7 +276,7 @@ actually removed or not
 q) create a pod called web-pod using image nginx, expose it internally with
 a service called web-pod-svc. check that you are able to look up the service
 and pod from within the cluster
-use the image: busybox:1.28 for dns lookup
+use the image: busybox:1.28 for dns 
 record results in /root/web-svc.svc and /root/web-pod.pod
 
 vim 1-pod.yaml
@@ -310,12 +310,12 @@ spec:
 kubectl apply -f 1-pod.yaml
 kubectl apply -f 1-service.yaml
 
-kubectl run lookuppod --image=busybox:1.28
+kubectl run pod --image=busybox:1.28
 
 kubectl get pods -o wide //note the ipa of the pod
 
-kubectl exec -it lookuppod -- nslookup web-pod-svc > /root/web-svc.svc
-kubectl exec -it lookuppod -- nslookup 192-168-10-8.default.pod > /root/web-pod.pod
+kubectl exec -it pod -- nslookup web-pod-svc > /root/web-svc.svc
+kubectl exec -it pod -- nslookup 192-168-10-8.default.pod > /root/web-pod.pod
 
 for pods you need to provide its ipa, octets separated by - and followed by
 namespace (default in this case) and then followed by pod

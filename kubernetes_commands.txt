@@ -45,7 +45,7 @@ kubectl apply -f {file_name} --namespace={namespace_name}
 
 kubectl logs {pod_name}
 kubectl exec -it {pod_name} -- bin/bash
-kubectl exec -it {pod_name} -- nslookup {svc_name}
+kubectl exec -it {pod_name} -- ns {svc_name}
 
 kubectl describe pod {pod_name}
 kubectl describe pod {pod_name} | grep -i image
