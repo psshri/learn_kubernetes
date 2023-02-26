@@ -21,3 +21,25 @@ systemctl daemon-reload && systemctl restart kubelet
 
 
 kubeadm token create --print-join-command
+
+kubectl get ns | wc -l
+
+ek pod se doosre pod ko ping karne ke liye
+curl -s ip:port
+
+
+imp directories:
+/etc/kubernetes/
+/etc/cni/
+/.kube/
+/var/lib/kubelet/
+/etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+
+
+assign pods to nodes
+-nodeName
+-nodeSelectors against node labels
+-nodeAffinity and interPodAffinity
+                - interPodAffinity
+                - interPodAntiAffinity
+-taints and tolerations
